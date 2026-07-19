@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CS2 Lenticular Preview</title>
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: #0b0e0d;
+  --panel: #121715;
+  --panel-2: #181f1c;
+  --line: #2a3530;
+  --text: #edf6f0;
+  --muted: #8fa098;
+  --green: #9dfc45;
+  --green-2: #4bd682;
+  --danger: #ff5c5c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(70, 170, 80, .10), transparent 34%),
+    linear-gradient(160deg, #0d110f, var(--bg));
+  color: var(--text);
+  font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+button, input, select { font: inherit; }
+
+.app-shell { max-width: 1560px; margin: 0 auto; padding: 28px; }
+.topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+.eyebrow { margin: 0 0 4px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .18em; }
+h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1; letter-spacing: -.04em; }
+.subtitle { margin: 9px 0 0; color: var(--muted); }
+.status { max-width: 420px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(18, 23, 21, .8); color: var(--muted); text-align: center; }
+.status.ready { border-color: rgba(157, 252, 69, .45); color: var(--green); }
+.status.error { border-color: rgba(255, 92, 92, .5); color: #ff9c9c; }
+
+.workspace { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; }
+.panel, .preview-card { border: 1px solid var(--line); border-radius: 18px; background: rgba(18, 23, 21, .94); box-shadow: 0 24px 60px rgba(0,0,0,.26); }
+.controls { padding: 18px; }
+.section { padding: 2px 0 18px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.section h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.file-field { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 11px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2); cursor: pointer; }
+.file-field:hover { border-color: #456052; }
+.file-field.dragover { border-color: var(--green); background: rgba(157, 252, 69, .10); box-shadow: inset 0 0 0 1px rgba(157, 252, 69, .25); }
+.file-field span { color: var(--muted); font-size: 12px; }
+.file-field strong { grid-column: 1 / -1; overflow: hidden; color: #d9e5de; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.file-field input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.file-field::after { content: "SELECT"; grid-column: 2; grid-row: 1; color: var(--green); font-size: 11px; font-weight: 750; }
+.file-field.dragover::after { content: "DROP"; }
+.optional { opacity: .86; }
+.label-row { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 7px; }
+.label-row output { color: var(--green); font-variant-numeric: tabular-nums; }
+.slider-control { display: grid; grid-template-columns: minmax(0, 1fr) 76px; align-items: center; gap: 10px; margin: 0 0 17px; }
+.slider { width: 100%; margin: 0; accent-color: var(--green); }
+.slider:last-child { margin-bottom: 0; }
+.number-input { width: 100%; padding: 6px 7px; border: 1px solid var(--line); border-radius: 7px; outline: none; background: #0e1311; color: var(--green); text-align: right; font-variant-numeric: tabular-nums; }
+.number-input:focus { border-color: #6fae45; }
+.grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-two label > span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+select { width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: #0e1311; color: var(--text); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.correction { padding-top: 0; }
+.correction summary { margin-bottom: 14px; color: #dfeae4; cursor: pointer; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.correction:not([open]) summary { margin-bottom: 0; }
+.setting-select { display: block; margin-bottom: 15px; }
+.setting-select > span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+.batch-count { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: #101512; color: var(--muted); }
+.batch-count input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--green); text-align: right; font-weight: 800; }
+.button { min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-weight: 750; }
+.button.primary { border-color: #86dc3d; background: var(--green); color: #12200d; }
+.button.secondary { background: #1a211e; color: #dce8e0; }
+.file-button { display: grid; place-items: center; text-align: center; }
+.file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.button:hover { filter: brightness(1.08); }
+.button:disabled { cursor: not-allowed; opacity: .45; }
+
+.preview-card {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  align-self: start;
+  height: calc(100vh - 32px);
+  min-height: 520px;
+  flex-direction: column;
+  overflow: hidden;
+}
+.canvas-wrap { position: relative; display: grid; min-height: 0; flex: 1; place-items: center; padding: 20px; overflow: hidden; background: #242927; }
+#preview { display: block; max-width: 100%; max-height: calc(100vh - 190px); border-radius: 4px; box-shadow: 0 18px 60px rgba(0,0,0,.32); image-rendering: auto; }
+.empty-state { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; padding: 30px; color: var(--muted); text-align: center; pointer-events: none; }
+.empty-state.hidden { display: none; }
+.empty-state p { margin: 14px 0 2px; color: #dce7e1; font-weight: 700; }
+.empty-icon { display: grid; width: 70px; height: 70px; place-items: center; border: 1px solid #405049; border-radius: 18px; background: #151b18; color: var(--green); font-size: 18px; font-weight: 900; letter-spacing: .12em; }
+.preview-footer { display: flex; justify-content: space-between; gap: 12px; padding: 11px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+code { color: #c6f7a5; }
+
+.support-footer { display: flex; align-items: center; justify-content: center; gap: 13px; padding: 14px 0 0; color: var(--muted); font-size: 12px; font-weight: 750; letter-spacing: .04em; }
+.support-links { display: flex; gap: 8px; }
+.support-links a { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: rgba(18, 23, 21, .85); color: #c9d7cf; transition: border-color .16s ease, color .16s ease, transform .16s ease; }
+.support-links a:hover { border-color: rgba(157, 252, 69, .65); color: var(--green); transform: translateY(-2px); }
+.support-links svg { width: 17px; height: 17px; fill: currentColor; }
+
+@media (max-width: 980px) {
+  .app-shell { padding: 16px; }
+  .topbar { align-items: flex-start; flex-direction: column; }
+  .workspace { grid-template-columns: 1fr; }
+  .preview-card { position: static; height: auto; min-height: 520px; }
+  #preview { max-height: 70vh; }
+}
+
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">CS2 STICKER TOOL</p>
+        <h1>Lenticular Preview</h1>
+        <p class="subtitle">Offline CS2 lenticular sticker effect simulator.</p>
+      </div>
+      <div class="status" id="status">Load a Holo Mask and Holo Spectrum</div>
+    </header>
+
+    <section class="workspace">
+      <aside class="panel controls">
+        <div class="section">
+          <h2>Textures</h2>
+          <label class="file-field">
+            <span>Holo Mask · TGA</span>
+            <input id="maskInput" type="file" accept=".tga,image/x-tga">
+            <strong id="maskName">Not selected</strong>
+          </label>
+          <label class="file-field">
+            <span>Holo Spectrum · TGA/PNG</span>
+            <input id="lentInput" type="file" accept=".tga,.png,.jpg,.jpeg,image/*">
+            <strong id="lentName">Not selected</strong>
+          </label>
+          <label class="file-field">
+            <span>Albedo Texture · TGA/PNG</span>
+            <input id="baseInput" type="file" accept=".tga,.png,.jpg,.jpeg,image/*">
+            <strong id="baseName">Not selected</strong>
+          </label>
+          <label class="file-field optional">
+            <span>Wear Mask · TGA/PNG</span>
+            <input id="wearInput" type="file" accept=".tga,.png,.jpg,.jpeg,image/*">
+            <strong id="wearName">No wear</strong>
+          </label>
+        </div>
+
+        <div class="section">
+          <div class="label-row">
+            <label for="angle">View Angle</label>
+            <output id="angleValue">0.00</output>
+          </div>
+          <input id="angle" class="slider" type="range" min="-1" max="1" value="0" step="0.001">
+
+          <div class="label-row">
+            <label for="travel">Spectrum Travel</label>
+            <output id="travelValue">255 px</output>
+          </div>
+          <input id="travel" class="slider" type="range" min="0" max="255" value="255" step="1">
+
+          <div class="label-row">
+            <label for="animationSpeed">Animation Speed</label>
+            <output id="animationSpeedValue">1.00×</output>
+          </div>
+          <input id="animationSpeed" class="slider" type="range" min="0.1" max="3" value="1" step="0.05">
+
+          <div class="label-row">
+            <label for="strength">Holo Strength (R)</label>
+            <output id="strengthValue">100%</output>
+          </div>
+          <input id="strength" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+
+        </div>
+
+        <div class="section grid-two">
+          <label>
+            <span>Holo Spectrum X</span>
+            <select id="edgeMode">
+              <option value="clamp">Clamp</option>
+              <option value="wrap" selected>Repeat</option>
+            </select>
+          </label>
+          <label>
+            <span>Blend Mode</span>
+            <select id="blendMode">
+              <option value="normal">Normal</option>
+              <option value="screen">Screen</option>
+              <option value="add">Add</option>
+            </select>
+          </label>
+          <label>
+            <span>Preview Channel</span>
+            <select id="viewMode">
+              <option value="result">Final Result</option>
+              <option value="r">R · Intensity</option>
+              <option value="g">G · Left–Right</option>
+              <option value="b">B · Top–Down</option>
+              <option value="wear">Wear Mask · Opacity</option>
+              <option value="lent">Holo Spectrum</option>
+            </select>
+          </label>
+          <label>
+            <span>Background</span>
+            <select id="backgroundMode">
+              <option value="dark">Dark</option>
+              <option value="checker">Checkerboard</option>
+              <option value="transparent">Transparent</option>
+            </select>
+          </label>
+        </div>
+
+        <details class="section correction">
+          <summary>Wear Mask Adjustments</summary>
+          <label class="setting-select">
+            <span>Mask Mapping</span>
+            <select id="wearMode">
+              <option value="white-visible">White = Visible</option>
+              <option value="black-visible">Black = Visible</option>
+            </select>
+          </label>
+          <div class="label-row"><label for="wearContrast">Contrast</label><output id="wearContrastValue">1.00×</output></div>
+          <input id="wearContrast" class="slider" type="range" min="0.1" max="5" value="1" step="0.01">
+          <div class="label-row"><label for="wearBrightness">Brightness</label><output id="wearBrightnessValue">100%</output></div>
+          <input id="wearBrightness" class="slider" type="range" min="0" max="10" value="1" step="0.01">
+        </details>
+
+        <details class="section correction">
+          <summary>Albedo Texture Adjustments</summary>
+          <div class="label-row"><label for="baseContrast">Contrast</label><output id="baseContrastValue">100%</output></div>
+          <input id="baseContrast" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+          <div class="label-row"><label for="baseHue">Hue</label><output id="baseHueValue">0°</output></div>
+          <input id="baseHue" class="slider" type="range" min="-180" max="180" value="0" step="1">
+          <div class="label-row"><label for="baseSaturation">Saturation</label><output id="baseSaturationValue">100%</output></div>
+          <input id="baseSaturation" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+          <div class="label-row"><label for="baseBrightness">Brightness</label><output id="baseBrightnessValue">100%</output></div>
+          <input id="baseBrightness" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+        </details>
+
+        <details class="section correction">
+          <summary>Holo Spectrum Adjustments</summary>
+          <div class="label-row"><label for="lentContrast">Contrast</label><output id="lentContrastValue">100%</output></div>
+          <input id="lentContrast" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+          <div class="label-row"><label for="lentHue">Hue</label><output id="lentHueValue">0°</output></div>
+          <input id="lentHue" class="slider" type="range" min="-180" max="180" value="0" step="1">
+          <div class="label-row"><label for="lentSaturation">Saturation</label><output id="lentSaturationValue">100%</output></div>
+          <input id="lentSaturation" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+          <div class="label-row"><label for="lentBrightness">Brightness</label><output id="lentBrightnessValue">100%</output></div>
+          <input id="lentBrightness" class="slider" type="range" min="0" max="2" value="1" step="0.01">
+        </details>
+
+        <div class="section actions">
+          <button id="animate" class="button primary">▶ Animate</button>
+          <button id="exportPng" class="button secondary">Export PNG</button>
+          <label class="batch-count">
+            <span>Frames</span>
+            <input id="batchCount" type="number" min="2" max="60" value="8">
+          </label>
+          <button id="exportBatch" class="button secondary">Export Batch ZIP</button>
+          <button id="saveSettings" class="button secondary">Save Settings</button>
+          <label class="button secondary file-button">
+            Load Settings
+            <input id="loadSettings" type="file" accept=".json,application/json">
+          </label>
+        </div>
+
+        <footer class="support-footer">
+          <span>Support me</span>
+          <div class="support-links">
+            <a href="https://x.com/_xXimiKk_" target="_blank" rel="noopener noreferrer" aria-label="X / Twitter" title="X / Twitter">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/>
+              </svg>
+            </a>
+            <a href="https://steamcommunity.com/id/_XimiK__/myworkshopfiles/" target="_blank" rel="noopener noreferrer" aria-label="Steam Workshop" title="Steam Workshop">
+              <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z"/>
+              </svg>
+            </a>
+          </div>
+        </footer>
+      </aside>
+
+      <section class="preview-card">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="preview" width="960" height="540"></canvas>
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">RGB</div>
+            <p>Load Textures</p>
+            <small>Drop each texture into its matching slot on the left</small>
+          </div>
+        </div>
+        <footer class="preview-footer">
+          <span id="resolution">—</span>
+        </footer>
+      </section>
+    </section>
+
+  </main>
+  <script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const ui = {
+  maskInput: $("maskInput"), lentInput: $("lentInput"), baseInput: $("baseInput"), wearInput: $("wearInput"),
+  maskName: $("maskName"), lentName: $("lentName"), baseName: $("baseName"), wearName: $("wearName"),
+  angle: $("angle"), travel: $("travel"), animationSpeed: $("animationSpeed"), strength: $("strength"), wearContrast: $("wearContrast"), wearBrightness: $("wearBrightness"),
+  angleValue: $("angleValue"), travelValue: $("travelValue"), animationSpeedValue: $("animationSpeedValue"), strengthValue: $("strengthValue"), wearContrastValue: $("wearContrastValue"), wearBrightnessValue: $("wearBrightnessValue"),
+  edgeMode: $("edgeMode"), blendMode: $("blendMode"), viewMode: $("viewMode"),
+  backgroundMode: $("backgroundMode"), wearMode: $("wearMode"), animate: $("animate"), exportPng: $("exportPng"),
+  baseContrast: $("baseContrast"), baseHue: $("baseHue"), baseSaturation: $("baseSaturation"), baseBrightness: $("baseBrightness"),
+  baseContrastValue: $("baseContrastValue"), baseHueValue: $("baseHueValue"), baseSaturationValue: $("baseSaturationValue"), baseBrightnessValue: $("baseBrightnessValue"),
+  lentContrast: $("lentContrast"), lentHue: $("lentHue"), lentSaturation: $("lentSaturation"), lentBrightness: $("lentBrightness"),
+  lentContrastValue: $("lentContrastValue"), lentHueValue: $("lentHueValue"), lentSaturationValue: $("lentSaturationValue"), lentBrightnessValue: $("lentBrightnessValue"),
+  batchCount: $("batchCount"), exportBatch: $("exportBatch"),
+  saveSettings: $("saveSettings"), loadSettings: $("loadSettings"),
+  preview: $("preview"), canvasWrap: $("canvasWrap"), emptyState: $("emptyState"),
+  status: $("status"), resolution: $("resolution")
+};
+
+const state = {
+  mask: null,
+  lent: null,
+  base: null,
+  wear: null,
+  scaledMask: null,
+  scaledBase: null,
+  scaledWear: null,
+  animationId: 0,
+  animationStart: 0,
+  renderQueued: false
+};
+
+const numericRanges = [
+  ui.angle, ui.travel, ui.animationSpeed, ui.strength, ui.wearContrast, ui.wearBrightness,
+  ui.baseContrast, ui.baseHue, ui.baseSaturation, ui.baseBrightness,
+  ui.lentContrast, ui.lentHue, ui.lentSaturation, ui.lentBrightness
+];
+
+const settingsControls = [
+  ...numericRanges,
+  ui.edgeMode, ui.blendMode, ui.viewMode, ui.backgroundMode, ui.wearMode,
+  ui.batchCount
+];
+
+function collectSettings() {
+  return Object.fromEntries(settingsControls.map(control => [control.id, control.value]));
+}
+
+function applySettings(values) {
+  if (!values || typeof values !== "object") throw new Error("Invalid settings file");
+  for (const control of settingsControls) {
+    if (!(control.id in values)) continue;
+    const requested = String(values[control.id]);
+    if (control.type === "range" || control.type === "number") {
+      const number = Number(requested);
+      if (!Number.isFinite(number)) continue;
+      control.value = Math.max(Number(control.min), Math.min(Number(control.max), number));
+    } else if ([...control.options].some(option => option.value === requested)) {
+      control.value = requested;
+    }
+  }
+  updateLabels();
+  requestRender();
+}
+
+function saveSettings() {
+  const preset = {
+    format: "CS2 Lenticular Preview Settings",
+    version: 1,
+    settings: collectSettings()
+  };
+  downloadBlob(new Blob([JSON.stringify(preset, null, 2)], { type: "application/json" }), "lenticular-settings.json");
+  setStatus("Settings saved", "ready");
+}
+
+async function loadSettings(file) {
+  if (!file) return;
+  try {
+    const preset = JSON.parse(await file.text());
+    applySettings(preset.settings ?? preset);
+    setStatus(`Settings loaded · ${file.name}`, "ready");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not load settings", "error");
+  } finally {
+    ui.loadSettings.value = "";
+  }
+}
+
+function addNumericInputs() {
+  for (const range of numericRanges) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "slider-control";
+    range.parentNode.insertBefore(wrapper, range);
+    wrapper.appendChild(range);
+
+    const number = document.createElement("input");
+    number.type = "number";
+    number.className = "number-input";
+    number.min = range.min;
+    number.max = range.max;
+    number.step = range.step;
+    number.value = range.value;
+    number.setAttribute("aria-label", `${range.id} numeric value`);
+    wrapper.appendChild(number);
+    range.numericInput = number;
+
+    number.addEventListener("input", () => {
+      if (number.value === "" || !Number.isFinite(number.valueAsNumber)) return;
+      const value = Math.max(Number(range.min), Math.min(Number(range.max), number.valueAsNumber));
+      range.value = value;
+      updateLabels();
+      requestRender();
+    });
+    number.addEventListener("change", () => {
+      const fallback = Number(range.value);
+      const value = Number.isFinite(number.valueAsNumber) ? number.valueAsNumber : fallback;
+      range.value = Math.max(Number(range.min), Math.min(Number(range.max), value));
+      number.value = range.value;
+      updateLabels();
+      requestRender();
+    });
+  }
+}
+
+function enforceBatchCount(finalize = false) {
+  if (ui.batchCount.value === "" && !finalize) return;
+  const parsed = Number.parseInt(ui.batchCount.value, 10);
+  if (!Number.isFinite(parsed)) {
+    if (finalize) ui.batchCount.value = 8;
+    return;
+  }
+  ui.batchCount.value = finalize ? Math.max(2, Math.min(60, parsed)) : Math.min(60, parsed);
+}
+
+function setStatus(message, kind = "") {
+  ui.status.textContent = message;
+  ui.status.className = `status ${kind}`.trim();
+}
+
+function decodeTga(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 18) throw new Error("The TGA file is too short");
+  const view = new DataView(buffer);
+  const idLength = bytes[0];
+  const colorMapType = bytes[1];
+  const imageType = bytes[2];
+  const colorMapLength = view.getUint16(5, true);
+  const colorMapDepth = bytes[7];
+  const width = view.getUint16(12, true);
+  const height = view.getUint16(14, true);
+  const pixelDepth = bytes[16];
+  const descriptor = bytes[17];
+
+  if (!width || !height) throw new Error("Invalid TGA dimensions");
+  if (![2, 3, 10, 11].includes(imageType)) {
+    throw new Error(`TGA type ${imageType} is not supported`);
+  }
+  if (colorMapType !== 0) throw new Error("Color-mapped TGA files are not supported");
+
+  const gray = imageType === 3 || imageType === 11;
+  const rle = imageType === 10 || imageType === 11;
+  const bytesPerPixel = gray ? Math.max(1, pixelDepth >> 3) : pixelDepth >> 3;
+  if ((!gray && ![3, 4].includes(bytesPerPixel)) || (gray && ![1, 2].includes(bytesPerPixel))) {
+    throw new Error(`Unsupported TGA bit depth: ${pixelDepth}`);
+  }
+
+  let offset = 18 + idLength + Math.ceil(colorMapLength * colorMapDepth / 8);
+  const pixelCount = width * height;
+  const raw = new Uint8Array(pixelCount * 4);
+  let written = 0;
+
+  const readPixel = () => {
+    if (offset + bytesPerPixel > bytes.length) throw new Error("Unexpected end of TGA file");
+    let r, g, b, a = 255;
+    if (gray) {
+      r = g = b = bytes[offset++];
+      if (bytesPerPixel === 2) a = bytes[offset++];
+    } else {
+      b = bytes[offset++]; g = bytes[offset++]; r = bytes[offset++];
+      if (bytesPerPixel === 4) a = bytes[offset++];
+    }
+    return [r, g, b, a];
+  };
+
+  const writePixel = (pixel) => {
+    if (written >= pixelCount) return;
+    const target = written * 4;
+    raw[target] = pixel[0]; raw[target + 1] = pixel[1];
+    raw[target + 2] = pixel[2]; raw[target + 3] = pixel[3];
+    written++;
+  };
+
+  if (!rle) {
+    while (written < pixelCount) writePixel(readPixel());
+  } else {
+    while (written < pixelCount) {
+      if (offset >= bytes.length) throw new Error("Corrupted RLE TGA file");
+      const header = bytes[offset++];
+      const count = (header & 0x7f) + 1;
+      if (header & 0x80) {
+        const pixel = readPixel();
+        for (let i = 0; i < count; i++) writePixel(pixel);
+      } else {
+        for (let i = 0; i < count; i++) writePixel(readPixel());
+      }
+    }
+  }
+
+  const topOrigin = Boolean(descriptor & 0x20);
+  const rightOrigin = Boolean(descriptor & 0x10);
+  const rgba = new Uint8ClampedArray(raw.length);
+  for (let sy = 0; sy < height; sy++) {
+    for (let sx = 0; sx < width; sx++) {
+      const dx = rightOrigin ? width - 1 - sx : sx;
+      const dy = topOrigin ? sy : height - 1 - sy;
+      const src = (sy * width + sx) * 4;
+      const dst = (dy * width + dx) * 4;
+      rgba[dst] = raw[src]; rgba[dst + 1] = raw[src + 1];
+      rgba[dst + 2] = raw[src + 2]; rgba[dst + 3] = raw[src + 3];
+    }
+  }
+  return { width, height, data: rgba };
+}
+
+async function decodeImageFile(file) {
+  if (/\.tga$/i.test(file.name) || file.type === "image/x-tga") {
+    return decodeTga(await file.arrayBuffer());
+  }
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width; canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return { width: image.width, height: image.height, data: image.data };
+}
+
+function imageToCanvas(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width; canvas.height = image.height;
+  canvas.getContext("2d").putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+  return canvas;
+}
+
+function scaleImage(image, width, height) {
+  if (!image) return null;
+  if (image.width === width && image.height === height) return image;
+  const src = imageToCanvas(image);
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, 0, 0, width, height);
+  const data = ctx.getImageData(0, 0, width, height).data;
+  return { width, height, data };
+}
+
+function choosePreviewSize() {
+  if (!state.mask) return { width: 960, height: 540 };
+  const maxSide = 1050;
+  const scale = Math.min(1, maxSide / Math.max(state.mask.width, state.mask.height));
+  return {
+    width: Math.max(1, Math.round(state.mask.width * scale)),
+    height: Math.max(1, Math.round(state.mask.height * scale))
+  };
+}
+
+function preparePreview() {
+  if (!state.mask) return;
+  const { width, height } = choosePreviewSize();
+  ui.preview.width = width; ui.preview.height = height;
+  state.scaledMask = scaleImage(state.mask, width, height);
+  state.scaledBase = scaleImage(state.base, width, height);
+  state.scaledWear = scaleImage(state.wear, width, height);
+  ui.resolution.textContent = `${state.mask.width}×${state.mask.height} · preview ${width}×${height}`;
+}
+
+function clamp01(value) { return Math.max(0, Math.min(1, value)); }
+function wrap01(value) { return value - Math.floor(value); }
+
+function sampleBilinear(image, u, v, edgeMode) {
+  u = edgeMode === "wrap" ? wrap01(u) : clamp01(u);
+  v = clamp01(v);
+  const x = u * (image.width - 1);
+  const y = v * (image.height - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const x1 = edgeMode === "wrap" ? (x0 + 1) % image.width : Math.min(image.width - 1, x0 + 1);
+  const y1 = Math.min(image.height - 1, y0 + 1);
+  const tx = x - x0, ty = y - y0;
+  const d = image.data;
+  const i00 = (y0 * image.width + x0) * 4;
+  const i10 = (y0 * image.width + x1) * 4;
+  const i01 = (y1 * image.width + x0) * 4;
+  const i11 = (y1 * image.width + x1) * 4;
+  const out = [0, 0, 0, 0];
+  for (let c = 0; c < 4; c++) {
+    const top = d[i00 + c] * (1 - tx) + d[i10 + c] * tx;
+    const bottom = d[i01 + c] * (1 - tx) + d[i11 + c] * tx;
+    out[c] = top * (1 - ty) + bottom * ty;
+  }
+  return out;
+}
+
+function adjustmentValues(prefix) {
+  return {
+    contrast: Number(ui[`${prefix}Contrast`].value),
+    hue: Number(ui[`${prefix}Hue`].value) * Math.PI / 180,
+    saturation: Number(ui[`${prefix}Saturation`].value),
+    brightness: Number(ui[`${prefix}Brightness`].value)
+  };
+}
+
+function adjustColor(pixel, settings) {
+  let r = pixel[0] / 255, g = pixel[1] / 255, b = pixel[2] / 255;
+
+  const cosA = Math.cos(settings.hue);
+  const sinA = Math.sin(settings.hue);
+  const nr = (0.213 + cosA * 0.787 - sinA * 0.213) * r + (0.715 - cosA * 0.715 - sinA * 0.715) * g + (0.072 - cosA * 0.072 + sinA * 0.928) * b;
+  const ng = (0.213 - cosA * 0.213 + sinA * 0.143) * r + (0.715 + cosA * 0.285 + sinA * 0.140) * g + (0.072 - cosA * 0.072 - sinA * 0.283) * b;
+  const nb = (0.213 - cosA * 0.213 - sinA * 0.787) * r + (0.715 - cosA * 0.715 + sinA * 0.715) * g + (0.072 + cosA * 0.928 + sinA * 0.072) * b;
+  r = nr; g = ng; b = nb;
+
+  const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  r = luma + (r - luma) * settings.saturation;
+  g = luma + (g - luma) * settings.saturation;
+  b = luma + (b - luma) * settings.saturation;
+
+  r = ((r - 0.5) * settings.contrast + 0.5) * settings.brightness;
+  g = ((g - 0.5) * settings.contrast + 0.5) * settings.brightness;
+  b = ((b - 0.5) * settings.contrast + 0.5) * settings.brightness;
+  return [clamp01(r) * 255, clamp01(g) * 255, clamp01(b) * 255, pixel[3]];
+}
+
+function blend(base, effect, alpha, mode) {
+  const a = clamp01(alpha * (effect[3] / 255));
+  if (mode === "screen") {
+    return [0, 1, 2].map(c => base[c] * (1 - a) + (255 - (255 - base[c]) * (255 - effect[c]) / 255) * a);
+  }
+  if (mode === "add") {
+    return [0, 1, 2].map(c => Math.min(255, base[c] + effect[c] * a));
+  }
+  return [0, 1, 2].map(c => base[c] * (1 - a) + effect[c] * a);
+}
+
+function backgroundPixel(x, y, mode) {
+  if (mode === "transparent") return [0, 0, 0, 0];
+  if (mode === "checker") {
+    const light = ((x >> 4) + (y >> 4)) & 1;
+    const value = light ? 60 : 38;
+    return [value, value, value, 255];
+  }
+  return [31, 35, 33, 255];
+}
+
+function wearOpacity(wear, index, contrast, brightness, mode) {
+  if (!wear) return 1;
+  const d = wear.data;
+  let value = (d[index] * 0.2126 + d[index + 1] * 0.7152 + d[index + 2] * 0.0722) / 255;
+  if (mode === "black-visible") value = 1 - value;
+  value = clamp01(value * brightness);
+  return clamp01((value - 0.5) * contrast + 0.5);
+}
+
+function renderTo(canvas, mask, base, wear, exportFull = false) {
+  if (!mask || !state.lent) return;
+  const ctx = canvas.getContext("2d", { alpha: true });
+  const output = ctx.createImageData(mask.width, mask.height);
+  const out = output.data;
+  const m = mask.data;
+  const baseData = base?.data;
+  const angle = Number(ui.angle.value);
+  const travel = Number(ui.travel.value) / 255;
+  const strength = Number(ui.strength.value);
+  const edgeMode = ui.edgeMode.value;
+  const blendMode = ui.blendMode.value;
+  const viewMode = ui.viewMode.value;
+  const wearContrast = Number(ui.wearContrast.value);
+  const wearBrightness = Number(ui.wearBrightness.value);
+  const wearMode = ui.wearMode.value;
+  const baseAdjust = adjustmentValues("base");
+  const lentAdjust = adjustmentValues("lent");
+  const bgMode = exportFull ? "transparent" : ui.backgroundMode.value;
+
+  for (let y = 0; y < mask.height; y++) {
+    for (let x = 0; x < mask.width; x++) {
+      const i = (y * mask.width + x) * 4;
+      const r = m[i] / 255;
+      const g = m[i + 1] / 255;
+      const b = m[i + 2] / 255;
+      const wearAlpha = wearOpacity(wear, i, wearContrast, wearBrightness, wearMode);
+
+      if (viewMode === "r" || viewMode === "g" || viewMode === "b") {
+        const value = viewMode === "r" ? m[i] : viewMode === "g" ? m[i + 1] : m[i + 2];
+        out[i] = out[i + 1] = out[i + 2] = value; out[i + 3] = 255;
+        continue;
+      }
+      if (viewMode === "lent") {
+        const u = mask.width > 1 ? x / (mask.width - 1) : 0;
+        const v = mask.height > 1 ? y / (mask.height - 1) : 0;
+        const sample = adjustColor(sampleBilinear(state.lent, u, v, "clamp"), lentAdjust);
+        out[i] = sample[0]; out[i + 1] = sample[1]; out[i + 2] = sample[2]; out[i + 3] = 255;
+        continue;
+      }
+      if (viewMode === "wear") {
+        const value = Math.round(wearAlpha * 255);
+        out[i] = out[i + 1] = out[i + 2] = value; out[i + 3] = 255;
+        continue;
+      }
+
+      const rawBasePixel = baseData
+        ? [baseData[i], baseData[i + 1], baseData[i + 2], baseData[i + 3]]
+        : backgroundPixel(x, y, bgMode);
+      const basePixel = baseData ? adjustColor(rawBasePixel, baseAdjust) : rawBasePixel;
+
+      // CS2 lenticular mapping: R = intensity, G = left-right coordinate,
+      // B = top-down coordinate. Viewing angle shifts the G coordinate.
+      const angleOffset = ((angle + 1) * 0.5) * travel;
+      const sample = adjustColor(sampleBilinear(state.lent, g + angleOffset, b, edgeMode), lentAdjust);
+      const rgb = blend(basePixel, sample, r * strength, blendMode);
+      out[i] = rgb[0]; out[i + 1] = rgb[1]; out[i + 2] = rgb[2];
+      const combinedAlpha = baseData ? basePixel[3] : Math.max(basePixel[3], Math.round(r * strength * 255));
+      out[i + 3] = Math.round(combinedAlpha * wearAlpha);
+    }
+  }
+  ctx.putImageData(output, 0, 0);
+}
+
+function requestRender() {
+  if (state.renderQueued) return;
+  state.renderQueued = true;
+  requestAnimationFrame(() => {
+    state.renderQueued = false;
+    if (!state.scaledMask || !state.lent) return;
+    renderTo(ui.preview, state.scaledMask, state.scaledBase, state.scaledWear);
+  });
+}
+
+function updateLabels() {
+  for (const range of numericRanges) {
+    if (range.numericInput && document.activeElement !== range.numericInput) range.numericInput.value = range.value;
+  }
+  ui.angleValue.textContent = Number(ui.angle.value).toFixed(2);
+  ui.travelValue.textContent = `${ui.travel.value} px`;
+  ui.animationSpeedValue.textContent = `${Number(ui.animationSpeed.value).toFixed(2)}×`;
+  ui.strengthValue.textContent = `${Math.round(Number(ui.strength.value) * 100)}%`;
+  ui.wearContrastValue.textContent = `${Number(ui.wearContrast.value).toFixed(2)}×`;
+  ui.wearBrightnessValue.textContent = `${Math.round(Number(ui.wearBrightness.value) * 100)}%`;
+  ui.baseContrastValue.textContent = `${Math.round(Number(ui.baseContrast.value) * 100)}%`;
+  ui.baseHueValue.textContent = `${ui.baseHue.value}°`;
+  ui.baseSaturationValue.textContent = `${Math.round(Number(ui.baseSaturation.value) * 100)}%`;
+  ui.baseBrightnessValue.textContent = `${Math.round(Number(ui.baseBrightness.value) * 100)}%`;
+  ui.lentContrastValue.textContent = `${Math.round(Number(ui.lentContrast.value) * 100)}%`;
+  ui.lentHueValue.textContent = `${ui.lentHue.value}°`;
+  ui.lentSaturationValue.textContent = `${Math.round(Number(ui.lentSaturation.value) * 100)}%`;
+  ui.lentBrightnessValue.textContent = `${Math.round(Number(ui.lentBrightness.value) * 100)}%`;
+}
+
+async function setFile(kind, file) {
+  if (!file) return;
+  try {
+    setStatus(`Reading ${file.name}…`);
+    const image = await decodeImageFile(file);
+    state[kind] = image;
+    if (kind === "mask") ui.maskName.textContent = `${file.name} · ${image.width}×${image.height}`;
+    if (kind === "lent") ui.lentName.textContent = `${file.name} · ${image.width}×${image.height}`;
+    if (kind === "base") ui.baseName.textContent = `${file.name} · ${image.width}×${image.height}`;
+    if (kind === "wear") ui.wearName.textContent = `${file.name} · ${image.width}×${image.height}`;
+    preparePreview();
+    ui.emptyState.classList.toggle("hidden", Boolean(state.mask && state.lent));
+    if (state.mask && state.lent) {
+      setStatus("Ready · move the View Angle control", "ready");
+      requestRender();
+    } else {
+      setStatus("Holo Mask and Holo Spectrum are required");
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not read the file", "error");
+  }
+}
+
+function toggleAnimation() {
+  if (state.animationId) {
+    cancelAnimationFrame(state.animationId);
+    state.animationId = 0;
+    ui.animate.textContent = "▶ Animate";
+    return;
+  }
+  state.animationStart = performance.now();
+  ui.animate.textContent = "■ Stop";
+  const tick = (time) => {
+    const phase = ((time - state.animationStart) / 1800) * Number(ui.animationSpeed.value);
+    ui.angle.value = Math.sin(phase * Math.PI * 2).toFixed(3);
+    updateLabels();
+    requestRender();
+    state.animationId = requestAnimationFrame(tick);
+  };
+  state.animationId = requestAnimationFrame(tick);
+}
+
+function exportPng() {
+  if (!state.mask || !state.lent) return;
+  setStatus("Rendering full-resolution PNG…");
+  setTimeout(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = state.mask.width; canvas.height = state.mask.height;
+    const base = scaleImage(state.base, state.mask.width, state.mask.height);
+    const wear = scaleImage(state.wear, state.mask.width, state.mask.height);
+    renderTo(canvas, state.mask, base, wear, true);
+    canvas.toBlob((blob) => {
+      if (!blob) return setStatus("Could not create PNG", "error");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `lenticular-angle-${Number(ui.angle.value).toFixed(2)}.png`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      setStatus("PNG exported", "ready");
+    }, "image/png");
+  }, 30);
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Could not create PNG")), "image/png");
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+}
+
+const crcTable = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(data) {
+  let crc = 0xffffffff;
+  for (const byte of data) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipHeader(size) {
+  return new Uint8Array(size);
+}
+
+function makeZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const data = file.data;
+    const crc = crc32(data);
+    const local = zipHeader(30 + name.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, data.length, true);
+    lv.setUint32(22, data.length, true);
+    lv.setUint16(26, name.length, true);
+    local.set(name, 30);
+    localParts.push(local, data);
+
+    const central = zipHeader(46 + name.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true);
+    central.set(name, 46);
+    centralParts.push(central);
+    offset += local.length + data.length;
+  }
+
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const end = zipHeader(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...localParts, ...centralParts, end], { type: "application/zip" });
+}
+
+async function exportBatch() {
+  if (!state.mask || !state.lent) return;
+  const count = Math.max(2, Math.min(60, Number.parseInt(ui.batchCount.value, 10) || 8));
+  ui.batchCount.value = count;
+  const oldAngle = ui.angle.value;
+  const oldView = ui.viewMode.value;
+  ui.viewMode.value = "result";
+  ui.exportBatch.disabled = true;
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = state.mask.width; canvas.height = state.mask.height;
+    const base = scaleImage(state.base, state.mask.width, state.mask.height);
+    const wear = scaleImage(state.wear, state.mask.width, state.mask.height);
+    const files = [];
+
+    for (let index = 0; index < count; index++) {
+      const angle = -1 + (2 * index) / (count - 1);
+      ui.angle.value = angle.toFixed(6);
+      updateLabels();
+      setStatus(`Rendering frame ${index + 1} of ${count}…`);
+      renderTo(canvas, state.mask, base, wear, true);
+      const blob = await canvasToBlob(canvas);
+      files.push({
+        name: `frame-${String(index + 1).padStart(3, "0")}_angle-${angle.toFixed(3)}.png`,
+        data: new Uint8Array(await blob.arrayBuffer())
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    setStatus("Building ZIP…");
+    downloadBlob(makeZip(files), `lenticular-${count}-frames.zip`);
+    setStatus(`Ready · exported ${count} frames`, "ready");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not export the batch", "error");
+  } finally {
+    ui.angle.value = oldAngle;
+    ui.viewMode.value = oldView;
+    updateLabels();
+    requestRender();
+    ui.exportBatch.disabled = false;
+  }
+}
+
+ui.maskInput.addEventListener("change", () => setFile("mask", ui.maskInput.files[0]));
+ui.lentInput.addEventListener("change", () => setFile("lent", ui.lentInput.files[0]));
+ui.baseInput.addEventListener("change", () => setFile("base", ui.baseInput.files[0]));
+ui.wearInput.addEventListener("change", () => setFile("wear", ui.wearInput.files[0]));
+ui.animate.addEventListener("click", toggleAnimation);
+ui.exportPng.addEventListener("click", exportPng);
+ui.exportBatch.addEventListener("click", exportBatch);
+ui.saveSettings.addEventListener("click", saveSettings);
+ui.loadSettings.addEventListener("change", () => loadSettings(ui.loadSettings.files[0]));
+ui.batchCount.addEventListener("input", () => enforceBatchCount(false));
+ui.batchCount.addEventListener("change", () => enforceBatchCount(true));
+
+for (const control of [
+  ui.angle, ui.travel, ui.animationSpeed, ui.strength, ui.wearContrast, ui.wearBrightness,
+  ui.baseContrast, ui.baseHue, ui.baseSaturation, ui.baseBrightness,
+  ui.lentContrast, ui.lentHue, ui.lentSaturation, ui.lentBrightness,
+  ui.edgeMode, ui.blendMode, ui.viewMode, ui.backgroundMode, ui.wearMode
+]) {
+  control.addEventListener("input", () => { updateLabels(); requestRender(); });
+  control.addEventListener("change", () => { updateLabels(); requestRender(); });
+}
+
+const textureDropTargets = [
+  ["mask", ui.maskInput],
+  ["lent", ui.lentInput],
+  ["base", ui.baseInput],
+  ["wear", ui.wearInput]
+];
+
+for (const [kind, input] of textureDropTargets) {
+  const zone = input.closest(".file-field");
+  for (const eventName of ["dragenter", "dragover"]) {
+    zone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      zone.classList.add("dragover");
+    });
+  }
+  zone.addEventListener("dragleave", (event) => {
+    if (!zone.contains(event.relatedTarget)) zone.classList.remove("dragover");
+  });
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    zone.classList.remove("dragover");
+    const file = [...event.dataTransfer.files].find(candidate =>
+      /\.(tga|png|jpe?g)$/i.test(candidate.name) || candidate.type.startsWith("image/")
+    );
+    if (file) setFile(kind, file);
+    else setStatus("Drop a TGA, PNG, or JPG texture", "error");
+  });
+}
+
+document.addEventListener("dragover", event => event.preventDefault());
+document.addEventListener("drop", event => event.preventDefault());
+
+addNumericInputs();
+updateLabels();
+ui.exportPng.disabled = false;
+ui.exportBatch.disabled = false;
+
+  </script>
+</body>
+</html>
