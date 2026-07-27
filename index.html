@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CS2 Lenticular Preview</title>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="./logo.svg?v=20260727">
   <style>
 :root {
   color-scheme: dark;
@@ -54,6 +55,7 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1; letter-spacin
 .file-field strong { grid-column: 1 / -1; overflow: hidden; color: #d9e5de; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .file-field input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .file-field::after { content: "SELECT"; grid-column: 2; grid-row: 1; color: var(--green); font-size: 11px; font-weight: 750; }
+.file-field.watching::after { content: "SELECTED"; }
 .file-field.dragover::after { content: "DROP"; }
 .optional { opacity: .86; }
 .label-row { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 7px; }
@@ -338,6 +340,13 @@ const state = {
   animationStart: 0,
   renderQueued: false
 };
+
+const fileWatchers = Object.fromEntries(
+  ["mask", "lent", "base", "wear"].map(kind => [
+    kind,
+    { handle: null, signature: "", busy: false, accessErrorShown: false }
+  ])
+);
 
 const numericRanges = [
   ui.angle, ui.travel, ui.animationSpeed, ui.strength, ui.wearContrast, ui.wearBrightness,
@@ -767,10 +776,23 @@ function updateLabels() {
   ui.lentBrightnessValue.textContent = `${Math.round(Number(ui.lentBrightness.value) * 100)}%`;
 }
 
-async function setFile(kind, file) {
+function fileSignature(file) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function setWatcher(kind, file, handle) {
+  const watcher = fileWatchers[kind];
+  watcher.handle = handle || null;
+  watcher.signature = fileSignature(file);
+  watcher.busy = false;
+  watcher.accessErrorShown = false;
+  ui[`${kind}Input`].closest(".file-field").classList.toggle("watching", Boolean(handle));
+}
+
+async function setFile(kind, file, { autoUpdated = false, silentError = false } = {}) {
   if (!file) return;
   try {
-    setStatus(`Reading ${file.name}…`);
+    if (!autoUpdated) setStatus(`Reading ${file.name}…`);
     const image = await decodeImageFile(file);
     state[kind] = image;
     if (kind === "mask") ui.maskName.textContent = `${file.name} · ${image.width}×${image.height}`;
@@ -780,15 +802,80 @@ async function setFile(kind, file) {
     preparePreview();
     ui.emptyState.classList.toggle("hidden", Boolean(state.mask && state.lent));
     if (state.mask && state.lent) {
-      setStatus("Ready · move the View Angle control", "ready");
+      setStatus(
+        autoUpdated ? `Updated automatically · ${file.name}` : "Ready · move the View Angle control",
+        "ready"
+      );
       requestRender();
     } else {
       setStatus("Holo Mask and Holo Spectrum are required");
     }
+    return true;
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not read the file", "error");
+    if (!silentError) setStatus(error.message || "Could not read the file", "error");
+    return false;
   }
+}
+
+async function assignTextureFile(kind, file, handle = null) {
+  if (!file) return false;
+  const loaded = await setFile(kind, file);
+  if (loaded) setWatcher(kind, file, handle);
+  return loaded;
+}
+
+function pickerOptions(kind) {
+  const accept = kind === "mask"
+    ? { "application/octet-stream": [".tga"] }
+    : {
+        "image/*": [".png", ".jpg", ".jpeg"],
+        "application/octet-stream": [".tga"]
+      };
+  return {
+    multiple: false,
+    types: [{ description: kind === "mask" ? "TGA texture" : "Texture files", accept }]
+  };
+}
+
+async function pickTextureWithWatcher(kind, input) {
+  try {
+    const [handle] = await window.showOpenFilePicker(pickerOptions(kind));
+    if (!handle) return;
+    await assignTextureFile(kind, await handle.getFile(), handle);
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    console.warn("File System Access picker is unavailable, using the standard picker.", error);
+    input.click();
+  }
+}
+
+async function pollFileWatcher(kind) {
+  const watcher = fileWatchers[kind];
+  if (!watcher.handle || watcher.busy) return;
+  watcher.busy = true;
+  try {
+    const file = await watcher.handle.getFile();
+    const signature = fileSignature(file);
+    if (signature === watcher.signature) return;
+    const loaded = await setFile(kind, file, { autoUpdated: true, silentError: true });
+    if (loaded) {
+      watcher.signature = signature;
+      watcher.accessErrorShown = false;
+    }
+  } catch (error) {
+    console.warn(`Could not watch ${kind} texture.`, error);
+    if (!watcher.accessErrorShown) {
+      watcher.accessErrorShown = true;
+      setStatus("Automatic reload paused · select the file again", "error");
+    }
+  } finally {
+    watcher.busy = false;
+  }
+}
+
+function pollWatchedFiles() {
+  for (const kind of Object.keys(fileWatchers)) pollFileWatcher(kind);
 }
 
 function toggleAnimation() {
@@ -959,10 +1046,10 @@ async function exportBatch() {
   }
 }
 
-ui.maskInput.addEventListener("change", () => setFile("mask", ui.maskInput.files[0]));
-ui.lentInput.addEventListener("change", () => setFile("lent", ui.lentInput.files[0]));
-ui.baseInput.addEventListener("change", () => setFile("base", ui.baseInput.files[0]));
-ui.wearInput.addEventListener("change", () => setFile("wear", ui.wearInput.files[0]));
+ui.maskInput.addEventListener("change", () => assignTextureFile("mask", ui.maskInput.files[0]));
+ui.lentInput.addEventListener("change", () => assignTextureFile("lent", ui.lentInput.files[0]));
+ui.baseInput.addEventListener("change", () => assignTextureFile("base", ui.baseInput.files[0]));
+ui.wearInput.addEventListener("change", () => assignTextureFile("wear", ui.wearInput.files[0]));
 ui.animate.addEventListener("click", toggleAnimation);
 ui.exportPng.addEventListener("click", exportPng);
 ui.exportBatch.addEventListener("click", exportBatch);
@@ -990,6 +1077,11 @@ const textureDropTargets = [
 
 for (const [kind, input] of textureDropTargets) {
   const zone = input.closest(".file-field");
+  zone.addEventListener("click", (event) => {
+    if (!window.showOpenFilePicker || event.target === input) return;
+    event.preventDefault();
+    pickTextureWithWatcher(kind, input);
+  });
   for (const eventName of ["dragenter", "dragover"]) {
     zone.addEventListener(eventName, (event) => {
       event.preventDefault();
@@ -1000,13 +1092,18 @@ for (const [kind, input] of textureDropTargets) {
   zone.addEventListener("dragleave", (event) => {
     if (!zone.contains(event.relatedTarget)) zone.classList.remove("dragover");
   });
-  zone.addEventListener("drop", (event) => {
+  zone.addEventListener("drop", async (event) => {
     event.preventDefault();
     zone.classList.remove("dragover");
-    const file = [...event.dataTransfer.files].find(candidate =>
+    const item = [...event.dataTransfer.items].find(candidate => candidate.kind === "file");
+    const handlePromise = item?.getAsFileSystemHandle
+      ? item.getAsFileSystemHandle().catch(() => null)
+      : Promise.resolve(null);
+    const file = item?.getAsFile() || [...event.dataTransfer.files].find(candidate =>
       /\.(tga|png|jpe?g)$/i.test(candidate.name) || candidate.type.startsWith("image/")
     );
-    if (file) setFile(kind, file);
+    const handle = await handlePromise;
+    if (file) assignTextureFile(kind, file, handle?.kind === "file" ? handle : null);
     else setStatus("Drop a TGA, PNG, or JPG texture", "error");
   });
 }
@@ -1018,6 +1115,10 @@ addNumericInputs();
 updateLabels();
 ui.exportPng.disabled = false;
 ui.exportBatch.disabled = false;
+setInterval(pollWatchedFiles, 800);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) pollWatchedFiles();
+});
 
   </script>
 </body>
